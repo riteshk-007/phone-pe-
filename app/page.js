@@ -1,3 +1,9 @@
+import Form from "./components/Form";
+
 export default function Home() {
-  return <h1>hello world</h1>;
+  return (
+    <div className="w-full">
+      <Form />
+    </div>
+  );
 }
