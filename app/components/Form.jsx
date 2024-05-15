@@ -12,55 +12,64 @@ const Form = () => {
     handleSubmit,
     formState: { errors },
   } = useForm();
+
   const onSubmit = async (data) => {
-    const transactionid = "Tr-" + uuidv4().toString(36).slice(-6);
+    try {
+      const transactionid = "Tr-" + uuidv4().toString(36).slice(-6);
 
-    const payload = {
-      merchantId: process.env.NEXT_PUBLIC_MERCHANT_ID,
-      merchantTransactionId: transactionid,
-      merchantUserId: "MUID-" + uuidv4().toString(36).slice(-6),
-      amount: 10000,
-      redirectUrl: `http://localhost:3000/api/status/${transactionid}`,
-      redirectMode: "POST",
-      callbackUrl: `http://localhost:3000/api/status/${transactionid}`,
-      mobileNumber: data.mobile,
-      paymentInstrument: {
-        type: "PAY_PAGE",
-      },
-    };
-
-    const dataPayload = JSON.stringify(payload);
-    console.log(dataPayload);
-
-    const dataBase64 = Buffer.from(dataPayload).toString("base64");
-    console.log(dataBase64);
-
-    const fullURL =
-      dataBase64 + "/pg/v1/pay" + process.env.NEXT_PUBLIC_SALT_KEY;
-    const dataSha256 = sha256(fullURL);
-
-    const checksum = dataSha256 + "###" + process.env.NEXT_PUBLIC_SALT_INDEX;
-    console.log("c====", checksum);
-
-    const UAT_PAY_API_URL =
-      "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay";
-
-    const response = await axios.post(
-      UAT_PAY_API_URL,
-      {
-        request: dataBase64,
-      },
-      {
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-          "X-VERIFY": checksum,
+      const payload = {
+        merchantId: process.env.NEXT_PUBLIC_MERCHANT_ID,
+        merchantTransactionId: transactionid,
+        merchantUserId: data.muid,
+        amount: parseInt(data.amount) * 100, // amount in paise
+        redirectUrl: `http://localhost:3000/api/status/${transactionid}`,
+        redirectMode: "POST",
+        callbackUrl: `http://localhost:3000/api/status/${transactionid}`,
+        mobileNumber: data.mobile,
+        paymentInstrument: {
+          type: "PAY_PAGE",
         },
-      }
-    );
+      };
 
-    const redirect = response.data.data.instrumentResponse.redirectInfo.url;
-    router.push(redirect);
+      const dataPayload = JSON.stringify(payload);
+      console.log("Data Payload:", dataPayload);
+
+      const dataBase64 = btoa(dataPayload); // base64 encoding for browsers
+      console.log("Data Base64:", dataBase64);
+
+      const fullURL =
+        dataBase64 + "/pg/v1/pay" + process.env.NEXT_PUBLIC_SALT_KEY;
+      const dataSha256 = sha256(fullURL).toString();
+
+      const checksum = dataSha256 + "###" + process.env.NEXT_PUBLIC_SALT_INDEX;
+      console.log("Checksum:", checksum);
+
+      const UAT_PAY_API_URL =
+        "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay";
+
+      const response = await axios.post(
+        UAT_PAY_API_URL,
+        {
+          request: dataBase64,
+        },
+        {
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json",
+            "X-VERIFY": checksum,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        const redirect = response.data.data.instrumentResponse.redirectInfo.url;
+        router.push(redirect);
+      } else {
+        console.error("Payment failed:", response.data);
+      }
+    } catch (error) {
+      console.error("Error during payment process:", error);
+    }
   };
 
   return (
